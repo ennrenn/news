@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>News feeds</title>
+<style>
+  :root {
+    --bg: #fafaf8; --fg: #1c1c1a; --muted: #6b6b66; --line: #dcdcd6;
+    --accent: #1d4ed8; --bad: #b42318; --card: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --fg: #ecece8; --muted: #9a9a93; --line: #35352f;
+      --accent: #7aa2ff; --bad: #ff8a80; --card: #1c1c1a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--fg);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1000px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .muted { color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .btn {
+    display: inline-block; padding: 8px 14px; border-radius: 6px; text-decoration: none;
+    border: 1px solid var(--accent); color: var(--accent); font-weight: 600;
+  }
+  .btn.primary { background: var(--accent); color: var(--bg); }
+  details { margin: 12px 0; padding: 8px 12px; border: 1px solid var(--bad); border-radius: 6px; color: var(--bad); }
+  details ul { margin: 8px 0 4px; padding-left: 20px; word-break: break-all; }
+  details.note { border-color: var(--line); color: var(--muted); }
+  details.note ul { word-break: normal; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 4px; }
+  .controls select, .controls input[type=date] {
+    padding: 9px 10px; font: inherit; background: var(--card); color: var(--fg);
+    border: 1px solid var(--line); border-radius: 6px;
+  }
+  .controls input[type=search] { flex: 1 1 240px; width: auto; margin: 0; }
+  .controls label { color: var(--muted); font-size: 0.85rem; }
+  .controls button { font: inherit; background: none; border: none; color: var(--accent); text-decoration: underline; cursor: pointer; padding: 0 4px; }
+  input[type=search] {
+    width: 100%; padding: 10px 12px; margin: 8px 0 4px; font: inherit;
+    background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 6px;
+  }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  td.date { white-space: nowrap; color: var(--muted); }
+  a { color: var(--accent); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>News feeds</h1>
+  <p id="summary" class="muted">Loading…</p>
+
+  <div class="actions">
+    <a class="btn primary" id="download" href="news_feeds.csv" download>Download CSV</a>
+  </div>
+
+  <details id="failures" hidden>
+    <summary id="failcount"></summary>
+    <ul id="faillist"></ul>
+  </details>
+
+  <details id="notes" class="note" hidden>
+    <summary id="notecount"></summary>
+    <ul id="notelist"></ul>
+  </details>
+
+  <div class="controls">
+    <input type="search" id="filter" placeholder="Filter by title, author or category" aria-label="Filter articles">
+    <select id="source" aria-label="Source"><option value="">All sources</option></select>
+    <label>From <input type="date" id="from"></label>
+    <label>To <input type="date" id="to"></label>
+    <button type="button" id="clearDates">Clear dates</button>
+  </div>
+  <p id="shown" class="muted"></p>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Published</th><th>Title</th><th>Source</th><th>Author or department</th><th>Categories</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+const MAX_ROWS = 300;
+const $ = (id) => document.getElementById(id);
+const fmt = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" });
+
+function addCell(tr, text, cls) {
+  const td = document.createElement("td");
+  if (cls) td.className = cls;
+  td.textContent = text;
+  tr.appendChild(td);
+  return td;
+}
+
+function render(articles) {
+  const needle = $("filter").value.trim().toLowerCase();
+  const source = $("source").value;
+  const from = $("from").value, to = $("to").value;   // days, as YYYY-MM-DD (UTC)
+  const hits = articles.filter((a) => {
+    if (needle && !a._hay.includes(needle)) return false;
+    if (source && a.source !== source) return false;
+    if (from || to) {
+      const day = (a.published || "").slice(0, 10);
+      if (!day || (from && day < from) || (to && day > to)) return false;
+    }
+    return true;
+  });
+  const body = $("rows");
+  body.replaceChildren();
+  for (const a of hits.slice(0, MAX_ROWS)) {
+    const tr = document.createElement("tr");
+    addCell(tr, a.published ? fmt.format(new Date(a.published)) : "", "date");
+    const titleCell = addCell(tr, "");
+    if (/^https?:\/\//.test(a.link)) {
+      const link = document.createElement("a");
+      link.href = a.link;
+      link.textContent = a.title || a.link;
+      link.target = "_blank";
+      link.rel = "noopener";
+      titleCell.appendChild(link);
+    } else {
+      titleCell.textContent = a.title;
+    }
+    addCell(tr, a.source);
+    addCell(tr, a.author);
+    addCell(tr, a.categories.split(" | ").slice(0, 4).join(", "));
+    body.appendChild(tr);
+  }
+  $("shown").textContent =
+    `Showing ${Math.min(hits.length, MAX_ROWS)} of ${hits.length} articles` +
+    (hits.length > MAX_ROWS ? ". The CSV has them all." : ".");
+}
+
+async function load() {
+  const [status, articles] = await Promise.all([
+    fetch("status.json").then((r) => r.json()),
+    fetch("articles.json").then((r) => r.json()),
+  ]);
+
+  const day = new Intl.DateTimeFormat("en-GB", { dateStyle: "long", timeZone: "UTC" });
+  const since = status.date_from ? ` from ${day.format(new Date(status.date_from + "T00:00:00Z"))} onwards` : "";
+  const left = (status.items_older_left_out ? `, with ${status.items_older_left_out} older items left out` : "") +
+    (status.items_carried_over ? `, and ${status.items_carried_over} articles kept from earlier runs` : "");
+  $("summary").textContent =
+    `${status.feeds_ok} of ${status.feeds_total} feeds fetched, giving ${status.items_unique} articles${since} ` +
+    `(${status.items_total} items fetched before duplicates were merged${left}). Last run ${fmt.format(new Date(status.generated_at))}.`;
+
+  if (status.failures.length) {
+    $("failcount").textContent = `${status.failures.length} feed(s) failed`;
+    for (const f of status.failures) {
+      const li = document.createElement("li");
+      li.textContent = `${f.url} (${f.error})`;
+      $("faillist").appendChild(li);
+    }
+    $("failures").hidden = false;
+  }
+
+  const warnings = status.warnings || [];
+  if (warnings.length) {
+    $("notecount").textContent = `Notes from the last run (${warnings.length})`;
+    for (const w of warnings) {
+      const li = document.createElement("li");
+      li.textContent = w;
+      $("notelist").appendChild(li);
+    }
+    $("notes").hidden = false;
+  }
+
+  for (const a of articles) a._hay = `${a.title} ${a.source} ${a.author} ${a.categories}`.toLowerCase();
+  for (const s of [...new Set(articles.map((a) => a.source).filter(Boolean))].sort()) {
+    const option = document.createElement("option");
+    option.value = s;
+    option.textContent = s;
+    $("source").appendChild(option);
+  }
+  const again = () => render(articles);
+  for (const id of ["filter", "source", "from", "to"]) $(id).addEventListener("input", again);
+  $("clearDates").addEventListener("click", () => { $("from").value = ""; $("to").value = ""; again(); });
+  again();
+}
+
+load().catch(() => {
+  $("summary").textContent = "No data yet. The first scheduled run will build the CSV, or start one from the Actions tab.";
+  $("download").hidden = true;
+});
+</script>
+</body>
+</html>

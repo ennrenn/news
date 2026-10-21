@@ -1,0 +1,36 @@
+# The GOV.UK topics to watch, one per line, written exactly as GOV.UK titles them
+# (capital letters and commas matter). Blank lines and lines starting with # are ignored.
+#
+# Each run, the script rebuilds GOV.UK's topic tree and pulls the newest content (up to 1,500
+# items) across every topic below, including all the topics beneath each one.
+# If a title is not found, for example because GOV.UK renamed it, the page lists it under
+# "Notes from the last run" and carries on without it.
+# To leave GOV.UK out altogether, delete this file.
+
+Education, training and skills
+Government
+Work
+Childcare and early years
+Devolution
+Financial services
+Government graduate schemes
+Industrial strategy
+Labour market reform
+Local government
+Manufacturing
+National Health Service
+Public health
+Research and innovation in health and social care
+Technology in health and social care
+UK economy
+Visas and entry clearance
+Visas and immigration corporate
+Young people
+Youth employment and social issues
+Artificial intelligence
+Employing people
+Mental health of children and young people
+Pharmacy
+Regulation reform
+Research and development
+Further and higher education, skills and vocational training
