@@ -456,7 +456,8 @@ def load_archive(path):
                 rows.append({
                     "title": r.get("title", ""), "link": r.get("link", ""),
                     "guid": r.get("guid") or r.get("link", ""), "source": r.get("source", ""),
-                    "published": r.get("published", ""), "author": r.get("author", ""),
+                    # Back to the internal form, whichever way the saved copy was written.
+                    "published": to_iso(r.get("published", "")), "author": r.get("author", ""),
                     "categories": [c for c in r.get("categories", "").split(" | ") if c],
                     "description": r.get("description", ""), "image_url": r.get("image_url", ""),
                     "feeds": [x for x in r.get("source_feeds", "").split(" | ") if x],
@@ -532,12 +533,18 @@ def cutoff_from(start_date, max_age_days):
     return max(limits) if limits else ""
 
 
+def excel_date(iso):
+    """'2026-10-21T15:08:12Z' becomes '2026-10-21 15:08:12'. Excel treats the first form as
+    text, so it cannot sort or filter on it; the second it reads as a date and time (UTC)."""
+    return iso.replace("T", " ").rstrip("Z")
+
+
 def flatten(row):
     return {
         "title": row["title"],
         "link": row["link"],
         "source": row["source"],
-        "published": row["published"],
+        "published": excel_date(row["published"]),
         "author": row["author"],
         "categories": " | ".join(row["categories"]),
         "description": row["description"] if INCLUDE_DESCRIPTION else "",
@@ -618,7 +625,9 @@ def main():
 
     preview_cols = ["title", "link", "source", "published", "author", "categories", "feed_count"]
     with open(args.out / "articles.json", "w", encoding="utf-8") as f:
-        json.dump([{k: r[k] for k in preview_cols} for r in flat], f, ensure_ascii=False)
+        # The page reads these dates as UTC, so they keep the 'T' and 'Z' form.
+        json.dump([{**{k: out[k] for k in preview_cols}, "published": row["published"]}
+                   for row, out in zip(rows, flat)], f, ensure_ascii=False)
 
     status = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
